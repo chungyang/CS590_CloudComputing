@@ -1,10 +1,7 @@
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.*;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.List;
+
 
 public class TSClient {
 
@@ -25,12 +22,12 @@ public class TSClient {
 
             InetAddress IPAddress = InetAddress.getByName(ip);
             socket.setSoTimeout(500);
-
+            long counter = 0;
             while(System.currentTimeMillis() < current + 5000) {
 
                 long t1 = System.currentTimeMillis();
                 byte[] t1InBytes = longToBytes(t1);
-                DatagramPacket packet = new DatagramPacket(t1InBytes, t1InBytes.length, IPAddress, PORT);
+                DatagramPacket packet = new DatagramPacket(t1InBytes, t1InBytes.length, IPAddress, port);
                 socket.send(packet);
 
                 byte[] incomingByteBuffer = new byte[Long.BYTES * 2];
@@ -43,9 +40,10 @@ public class TSClient {
                     long t4 = System.currentTimeMillis();
                     long t2 = replies[0];
                     long t3 = replies[1];
-
+                    
                     rtt = t4 - t1 - (t3 - t2);
-                    offset = t3 + rtt / 2 - t4;
+                    offset += t3 + rtt / 2 - t4;
+                    counter++;
                 }
                 catch(SocketTimeoutException e){
                     System.out.println("Packet sent possibly got lost");
@@ -54,13 +52,13 @@ public class TSClient {
             }
 
             long localTime = System.currentTimeMillis();
-            remoteClock = localTime + offset;
+            remoteClock = localTime + offset / counter;
 
 
             StringBuilder sb = new StringBuilder();
-            sb.append("REMOTE_TIME: ").append(remoteClock).append(System.getProperty("line.separator"))
-                    .append("LOCAL_TIME: ").append(localTime).append(System.getProperty("line.separator"))
-                    .append("RTT_ESTIMATE: ").append(rtt);
+            sb.append("REMOTE_TIME ").append(remoteClock).append(System.getProperty("line.separator"))
+                    .append("LOCAL_TIME ").append(localTime).append(System.getProperty("line.separator"))
+                    .append("RTT_ESTIMATE ").append(rtt);
 
             System.out.println(sb.toString());
 
@@ -93,10 +91,8 @@ public class TSClient {
 
     public static void main(String[] args){
 
-        if(args.length < 1){
-            throw new IllegalArgumentException("Need to provide remote server address");
-        }
+        String address = args.length < 1? "localhost" : args[0];
 
-        sync(args[0], PORT);
+        sync(address, PORT);
     }
 }
