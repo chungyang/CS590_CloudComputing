@@ -40,9 +40,10 @@ public class TSClient {
                     long t4 = System.currentTimeMillis();
                     long t2 = replies[0];
                     long t3 = replies[1];
-                    
-                    rtt = t4 - t1 - (t3 - t2);
-                    offset += t3 + rtt / 2 - t4;
+                    System.out.println(t3);
+                    rtt += t4 - t1 - (t3 - t2);
+                    long tempRtt = t4 - t1 - (t3 - t2);
+                    offset += t3 + tempRtt / 2 - t4;
                     counter++;
                 }
                 catch(SocketTimeoutException e){
@@ -53,6 +54,7 @@ public class TSClient {
 
             long localTime = System.currentTimeMillis();
             remoteClock = localTime + offset / counter;
+            rtt /= counter;
 
 
             StringBuilder sb = new StringBuilder();
