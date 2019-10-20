@@ -23,7 +23,7 @@ public class TSClient {
             InetAddress IPAddress = InetAddress.getByName(ip);
             socket.setSoTimeout(500);
             long counter = 0;
-            while(System.currentTimeMillis() < current + 5000) {
+            while(System.currentTimeMillis() < current + 1000) {
 
                 long t1 = System.currentTimeMillis();
                 byte[] t1InBytes = longToBytes(t1);
@@ -40,14 +40,14 @@ public class TSClient {
                     long t4 = System.currentTimeMillis();
                     long t2 = replies[0];
                     long t3 = replies[1];
-                    System.out.println(t3);
+
                     rtt += t4 - t1 - (t3 - t2);
                     long tempRtt = t4 - t1 - (t3 - t2);
                     offset += t3 + tempRtt / 2 - t4;
                     counter++;
                 }
                 catch(SocketTimeoutException e){
-                    System.out.println("Packet sent possibly got lost");
+                    continue;
                 }
 
             }
@@ -56,12 +56,13 @@ public class TSClient {
             remoteClock = localTime + offset / counter;
             rtt /= counter;
 
-
             StringBuilder sb = new StringBuilder();
-            sb.append("REMOTE_TIME ").append(remoteClock).append(System.getProperty("line.separator"))
-                    .append("LOCAL_TIME ").append(localTime).append(System.getProperty("line.separator"))
-                    .append("RTT_ESTIMATE ").append(rtt);
 
+            sb.append(String.format("%-12s %d\n", "REMOTE_TIME", remoteClock)).append(String.format("%-12s %d\n", "LOCAL_TIME", localTime)).append(String.format("%-12s %d", "RTT_ESTIMATE", rtt));
+
+            // System.out.println(String.format("%-12s %d", "REMOTE_TIME", remoteClock));
+            // System.out.println(String.format("%-12s %d", "LOCAL_TIME", localTime));
+            // System.out.println(String.format("%-12s %d", "RTT_ESTIMATE", rtt));
             System.out.println(sb.toString());
 
 

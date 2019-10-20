@@ -24,12 +24,26 @@ public class MyDBReplicatedServer extends MyDBSingleServer {
 
     protected final MessageNIOTransport<String,String> serverMessenger;
     protected String myID;
-    protected long id;
-    protected Long messageID = new Long(0);
+    protected long id; //assign a numerical ID based on myID
+
+    //The messageID monotonically increases. It acts as the logical
+    //timestamp of the message
+    protected long messageID;
+
+    // Priority of a message depends on its messageID. Smaller ID has higher
+    // priority. If two messages have the same ID, then sender with smaller
+    // server ID takes higher priority
     protected PriorityQueue<Message> messageQueue;
+
+    // A hashmap to keep track of acks received for a message. Message has a key
+    // with format messageID.senderID
     protected Map<String, Set<Long>> ackMap = new HashMap<>();
+
+    // To keep track of the acknowledges sent so redundant acks don't throttle the
+    // network. Once the corresponding message has been processed, its entry in
+    // this hashset will be removed.
+    protected Set<String> ackHistory = new HashSet<>();
     protected int numberOfNodes;
-    protected Map<Long, Long> messageHistory = new HashMap<>();
 
 
     public MyDBReplicatedServer(NodeConfig<String> nodeConfig, String myID,
@@ -63,9 +77,6 @@ public class MyDBReplicatedServer extends MyDBSingleServer {
 
         this.numberOfNodes = this.serverMessenger.getNodeConfig().getNodeIDs().size();
 
-        for(long i = 0; i < this.numberOfNodes; i++){
-            messageHistory.put(i + 1, new Long(-1));
-        }
     }
 
     @Override
@@ -74,7 +85,9 @@ public class MyDBReplicatedServer extends MyDBSingleServer {
         try {
             Message message;
 
-            synchronized (ackMap){
+            //When a server receives a client request. It puts it in the priority queue
+            //and sets its own acknowledgement.
+            synchronized (this){
                 message = new Message(this.id, this.messageID, new String(bytes, SingleServer.DEFAULT_ENCODING));
                 messageQueue.add(message);
                 String messageKey = String.valueOf(message.messageID) + "." + String.valueOf(message.serverID);
@@ -106,7 +119,9 @@ public class MyDBReplicatedServer extends MyDBSingleServer {
         //Incoming message is an ack message
         if(message.message.contains("ack")){
 
-            synchronized (ackMap) {
+            //Locking the entire server instance to prevent race condition
+            //on shared variables
+            synchronized (this) {
                 Set<Long> acks = ackMap.getOrDefault(messageKey,new HashSet<>());
                 acks.add(Long.valueOf(message.message.replace("ack","")));
                 ackMap.put(messageKey, acks);
@@ -117,10 +132,12 @@ public class MyDBReplicatedServer extends MyDBSingleServer {
         }
 
 
-        synchronized (ackMap){
+        synchronized (this){
 
             messageQueue.add(message);
-
+            // This if condition prevents the possibility of a server receiving a request from
+            // client and "self-generating" a message with higher priority than the
+            // ones that have been acknowledged.
             if(message.messageID >= this.messageID){
                 this.messageID = message.messageID + 1;
             }
@@ -134,6 +151,11 @@ public class MyDBReplicatedServer extends MyDBSingleServer {
         }
 
     }
+
+    /**
+     * This method sends acknowledgement for a given message to all servers except itself
+     * @param messageToAck
+     */
     private void sendAck(Message messageToAck){
 
             Message ackMessage = new Message(messageToAck.serverID, messageToAck.messageID, "ack" + this.id);
@@ -150,18 +172,31 @@ public class MyDBReplicatedServer extends MyDBSingleServer {
             }
 
     }
+
+    /**
+     * This method does two things mainly. Acknowledge the message at the head of
+     * priority queue and checks if all acks have been received for this message.
+     * If yes, then execute the query contained in the message. It does this until
+     * either the priority queue is empty or the message at the head hasn't been
+     * acknowledged by all servers.
+     */
     private void processQueueRequest(){
 
         while(!messageQueue.isEmpty()){
             Message headMessage = messageQueue.peek();
-            sendAck(headMessage);
             String headMessageKey = String.valueOf(headMessage.messageID) + "." + String.valueOf(headMessage.serverID);
+
+            if(!ackHistory.contains(headMessageKey)){
+                sendAck(headMessage);
+                ackHistory.add(headMessageKey);
+            }
 
             if(ackMap.get(headMessageKey).size() != this.numberOfNodes){
                 break;
             }
 
             ackMap.remove(headMessageKey);
+            ackHistory.remove(headMessageKey);
 
             this.processQuery(messageQueue.poll().message);
 
@@ -169,6 +204,11 @@ public class MyDBReplicatedServer extends MyDBSingleServer {
 
     }
 
+    /**
+     * Serialize Message into array of bytes
+     * @param message
+     * @return
+     */
     private byte[] serializeMessage(Message message){
 
         List<Byte> bytes = new ArrayList<>();
@@ -198,6 +238,11 @@ public class MyDBReplicatedServer extends MyDBSingleServer {
         }
     }
 
+    /**
+     * Deserialize an array of bytes into a Message
+     * @param bytes
+     * @return
+     */
     private Message deserializeBytes(byte[] bytes){
         ByteBuffer byteBuffer = ByteBuffer.wrap(Arrays.copyOfRange(bytes, 0, 9));
         long id = byteBuffer.getLong();

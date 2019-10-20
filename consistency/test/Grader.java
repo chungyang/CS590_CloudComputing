@@ -1,4 +1,3 @@
-
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
@@ -121,55 +120,55 @@ public class Grader extends DefaultTest {
 
     }
 
-    /**
-     * This test tests a simple default DB command expected to always succeed.
-     *
-     * @throws IOException
-     * @throws InterruptedException
-     */
-    @Test
-    public void test01_DefaultAsync() throws IOException,
-            InterruptedException {
-        client.send(DEFAULT_SADDR, "select table_name from system_schema" +
-                ".tables");
-    }
+//    /**
+//     * This test tests a simple default DB command expected to always succeed.
+//     *
+//     * @throws IOException
+//     * @throws InterruptedException
+//     */
+//    @Test
+//    public void test01_DefaultAsync() throws IOException,
+//            InterruptedException {
+//        client.send(DEFAULT_SADDR, "select table_name from system_schema" +
+//                ".tables");
+//    }
 
-    /**
-     * Tests that a table is indeed being created successfully.
-     *
-     * @throws IOException
-     * @throws InterruptedException
-     */
-    @Test
-    public void test02_Single_CreateTable_Async() throws IOException,
-            InterruptedException {
-        testCreateTable(true, true);
-    }
+//    /**
+//     * Tests that a table is indeed being created successfully.
+//     *
+//     * @throws IOException
+//     * @throws InterruptedException
+//     */
+//    @Test
+//    public void test02_Single_CreateTable_Async() throws IOException,
+//            InterruptedException {
+//        testCreateTable(true, true);
+//    }
+//
+//
+//    @Test
+//    public void test03_InsertRecords_Async() throws IOException, InterruptedException {
+//        for (int i = 0; i < 10; i++) {
+//            send("insert into " + TABLE + " (ssn, firstname, lastname) " +
+//                    "values (" + (int) (Math.random() * Integer.MAX_VALUE) + ", '" +
+//                    "John" + i + "', '" + "Smith" + i + "')", true);
+//        }
+//        Thread.sleep(SLEEP);
+//    }
+//
+//    @Test
+//    public void test04_DeleteRecords_Async() throws IOException, InterruptedException {
+//        send("truncate users", true);
+//        Thread.sleep(SLEEP);
+//        ResultSet resultSet = session.execute("select count(*) from " + TABLE);
+//        Assert.assertTrue(!resultSet.isExhausted());
+//        Assert.assertEquals(0, resultSet.one().getLong(0));
+//    }
 
-
-    @Test
-    public void test03_InsertRecords_Async() throws IOException, InterruptedException {
-        for (int i = 0; i < 10; i++) {
-            send("insert into " + TABLE + " (ssn, firstname, lastname) " +
-                    "values (" + (int) (Math.random() * Integer.MAX_VALUE) + ", '" +
-                    "John" + i + "', '" + "Smith" + i + "')", true);
-        }
-        Thread.sleep(SLEEP);
-    }
-
-    @Test
-    public void test04_DeleteRecords_Async() throws IOException, InterruptedException {
-        send("truncate users", true);
-        Thread.sleep(SLEEP);
-        ResultSet resultSet = session.execute("select count(*) from " + TABLE);
-        Assert.assertTrue(!resultSet.isExhausted());
-        Assert.assertEquals(0, resultSet.one().getLong(0));
-    }
-
-    @Test
-    public void test05_CreateTable_Sync() throws IOException, InterruptedException {
-        testCreateTable(true, false);
-    }
+//    @Test
+//    public void test05_CreateTable_Sync() throws IOException, InterruptedException {
+//        testCreateTable(true, false);
+//    }
 
     /**
      * Create tables on all keyspaces.
@@ -190,138 +189,137 @@ public class Grader extends DefaultTest {
         for (String node : servers) {
             verifyTableExists(DEFAULT_TABLE_NAME, node, true);
         }
-
     }
-
-    /**
-     * Select a single server and send all SQL queries to the selected server.
-     * Then verify the results on all replicas to see whether they are consistent.
-     *
-     * @throws IOException
-     * @throws InterruptedException
-     */
-    @Test
-    public void test11_UpdateRecord_SingleServer() throws IOException, InterruptedException {
-        // generate a random key for this test
-        int key = ThreadLocalRandom.current().nextInt();
-
-        String selected = servers[0];
-        // insert a record first with an empty list
-        client.send(serverMap.get(selected), insertRecordIntoTableCmd(key, DEFAULT_TABLE_NAME));
-        Thread.sleep(SLEEP);
-
-        for (int i = 0; i < servers.length; i++) {
-            client.send(serverMap.get(selected), updateRecordOfTableCmd(key, DEFAULT_TABLE_NAME));
-            Thread.sleep(SLEEP);
-        }
-
-        verifyOrderConsistent(DEFAULT_TABLE_NAME, key);
-    }
-
-    /**
-     * Send a simple SQL query to every server in a round robin manner.
-     * Then verify the results in all replicas to see whether they are consistent.
-     *
-     * @throws IOException
-     * @throws InterruptedException
-     */
-    @Test
-    public void test12_UpdateRecord_AllServer() throws IOException, InterruptedException {
-        // generate a random key for this test
-        int key = ThreadLocalRandom.current().nextInt();
-
-        // insert a record first with an empty list, it doesn't matter which server we use, it should be consistent
-        client.send(serverMap.get(servers[0]), insertRecordIntoTableCmd(key, DEFAULT_TABLE_NAME));
-        Thread.sleep(SLEEP);
-
-        for (String node : servers) {
-            client.send(serverMap.get(node), updateRecordOfTableCmd(key, DEFAULT_TABLE_NAME));
-            Thread.sleep(SLEEP);
-        }
-
-        verifyOrderConsistent(DEFAULT_TABLE_NAME, key);
-    }
-
-    /**
-     * Send each SQL query to a random server.
-     * Then verify the results in all replicas to see whether they are consistent.
-     *
-     * @throws InterruptedException
-     * @throws IOException
-     */
-    @Test
-    public void test13_UpdateRecord_RandomServer() throws InterruptedException, IOException {
-        // generate a random key for this test
-        int key = ThreadLocalRandom.current().nextInt();
-
-        // insert a record first with an empty list, it doesn't matter which server we use, it should be consistent
-        client.send(serverMap.get(servers[0]), insertRecordIntoTableCmd(key, DEFAULT_TABLE_NAME));
-        Thread.sleep(SLEEP);
-
-        for (int i = 0; i < servers.length; i++) {
-            String node = servers[ThreadLocalRandom.current().nextInt(0, servers.length)];
-            client.send(serverMap.get(node), updateRecordOfTableCmd(key, DEFAULT_TABLE_NAME));
-            Thread.sleep(SLEEP);
-        }
-
-        verifyOrderConsistent(DEFAULT_TABLE_NAME, key);
-    }
-
-
-    /**
-     * This test is the same as test13, but it will send update request faster than test13, as it only sleeps 10ms
-     *
-     * @throws InterruptedException
-     * @throws IOException
-     */
-    @Test
-    public void test14_UpdateRecordFaster_RandomServer() throws InterruptedException, IOException {
-        // generate a random key for this test
-        int key = ThreadLocalRandom.current().nextInt();
-
-        // insert a record first with an empty list, it doesn't matter which server we use, it should be consistent
-        client.send(serverMap.get(servers[0]), insertRecordIntoTableCmd(key, DEFAULT_TABLE_NAME));
-        // this sleep is to guarantee that the record has been created
-        Thread.sleep(SLEEP);
-
-        for (int i = 0; i < servers.length; i++) {
-            String node = servers[ThreadLocalRandom.current().nextInt(0, servers.length)];
-            client.send(serverMap.get(node), updateRecordOfTableCmd(key, DEFAULT_TABLE_NAME));
-            // we just sleep 10 milliseconds this time
-            Thread.sleep(10);
-        }
-
-        Thread.sleep(SLEEP);
-        verifyOrderConsistent(DEFAULT_TABLE_NAME, key);
-    }
-
-
-    /**
-     * This test is also the same as test13, but it will send update request much faster than test13, as it only sleeps 1ms
-     *
-     * @throws InterruptedException
-     * @throws IOException
-     */
-    @Test
-    public void test15_UpdateRecordMuchFaster_RandomServer() throws InterruptedException, IOException {
-        // generate a random key for this test
-        int key = ThreadLocalRandom.current().nextInt();
-
-        // insert a record first with an empty list, it doesn't matter which server we use, it should be consistent
-        client.send(serverMap.get(servers[0]), insertRecordIntoTableCmd(key, DEFAULT_TABLE_NAME));
-        // this sleep is to guarantee that the record has been created
-        Thread.sleep(SLEEP);
-
-        for (int i = 0; i < servers.length; i++) {
-            String node = servers[ThreadLocalRandom.current().nextInt(0, servers.length)];
-            client.send(serverMap.get(node), updateRecordOfTableCmd(key, DEFAULT_TABLE_NAME));
-            // we just sleep 10 milliseconds this time
-            Thread.sleep(1);
-        }
-        Thread.sleep(SLEEP);
-
-        verifyOrderConsistent(DEFAULT_TABLE_NAME, key);
-    }
+//
+//    /**
+//     * Select a single server and send all SQL queries to the selected server.
+//     * Then verify the results on all replicas to see whether they are consistent.
+//     *
+//     * @throws IOException
+//     * @throws InterruptedException
+//     */
+//    @Test
+//    public void test11_UpdateRecord_SingleServer() throws IOException, InterruptedException {
+//        // generate a random key for this test
+//        int key = ThreadLocalRandom.current().nextInt();
+//
+//        String selected = servers[0];
+//        // insert a record first with an empty list
+//        client.send(serverMap.get(selected), insertRecordIntoTableCmd(key, DEFAULT_TABLE_NAME));
+//        Thread.sleep(SLEEP);
+//
+//        for (int i = 0; i < servers.length; i++) {
+//            client.send(serverMap.get(selected), updateRecordOfTableCmd(key, DEFAULT_TABLE_NAME));
+//            Thread.sleep(SLEEP);
+//        }
+//
+//        verifyOrderConsistent(DEFAULT_TABLE_NAME, key);
+//    }
+//
+//    /**
+//     * Send a simple SQL query to every server in a round robin manner.
+//     * Then verify the results in all replicas to see whether they are consistent.
+//     *
+//     * @throws IOException
+//     * @throws InterruptedException
+//     */
+//    @Test
+//    public void test12_UpdateRecord_AllServer() throws IOException, InterruptedException {
+//        // generate a random key for this test
+//        int key = ThreadLocalRandom.current().nextInt();
+//
+//        // insert a record first with an empty list, it doesn't matter which server we use, it should be consistent
+//        client.send(serverMap.get(servers[0]), insertRecordIntoTableCmd(key, DEFAULT_TABLE_NAME));
+//        Thread.sleep(SLEEP);
+//
+//        for (String node : servers) {
+//            client.send(serverMap.get(node), updateRecordOfTableCmd(key, DEFAULT_TABLE_NAME));
+//            Thread.sleep(SLEEP);
+//        }
+//
+//        verifyOrderConsistent(DEFAULT_TABLE_NAME, key);
+//    }
+//
+//    /**
+//     * Send each SQL query to a random server.
+//     * Then verify the results in all replicas to see whether they are consistent.
+//     *
+//     * @throws InterruptedException
+//     * @throws IOException
+//     */
+//    @Test
+//    public void test13_UpdateRecord_RandomServer() throws InterruptedException, IOException {
+//        // generate a random key for this test
+//        int key = ThreadLocalRandom.current().nextInt();
+//
+//        // insert a record first with an empty list, it doesn't matter which server we use, it should be consistent
+//        client.send(serverMap.get(servers[0]), insertRecordIntoTableCmd(key, DEFAULT_TABLE_NAME));
+//        Thread.sleep(SLEEP);
+//
+//        for (int i = 0; i < servers.length; i++) {
+//            String node = servers[ThreadLocalRandom.current().nextInt(0, servers.length)];
+//            client.send(serverMap.get(node), updateRecordOfTableCmd(key, DEFAULT_TABLE_NAME));
+//            Thread.sleep(SLEEP);
+//        }
+//
+//        verifyOrderConsistent(DEFAULT_TABLE_NAME, key);
+//    }
+//
+//
+//    /**
+//     * This test is the same as test13, but it will send update request faster than test13, as it only sleeps 10ms
+//     *
+//     * @throws InterruptedException
+//     * @throws IOException
+//     */
+//    @Test
+//    public void test14_UpdateRecordFaster_RandomServer() throws InterruptedException, IOException {
+//        // generate a random key for this test
+//        int key = ThreadLocalRandom.current().nextInt();
+//
+//        // insert a record first with an empty list, it doesn't matter which server we use, it should be consistent
+//        client.send(serverMap.get(servers[0]), insertRecordIntoTableCmd(key, DEFAULT_TABLE_NAME));
+//        // this sleep is to guarantee that the record has been created
+//        Thread.sleep(SLEEP);
+//
+//        for (int i = 0; i < servers.length; i++) {
+//            String node = servers[ThreadLocalRandom.current().nextInt(0, servers.length)];
+//            client.send(serverMap.get(node), updateRecordOfTableCmd(key, DEFAULT_TABLE_NAME));
+//            // we just sleep 10 milliseconds this time
+//            Thread.sleep(10);
+//        }
+//
+//        Thread.sleep(SLEEP);
+//        verifyOrderConsistent(DEFAULT_TABLE_NAME, key);
+//    }
+//
+//
+//    /**
+//     * This test is also the same as test13, but it will send update request much faster than test13, as it only sleeps 1ms
+//     *
+//     * @throws InterruptedException
+//     * @throws IOException
+//     */
+//    @Test
+//    public void test15_UpdateRecordMuchFaster_RandomServer() throws InterruptedException, IOException {
+//        // generate a random key for this test
+//        int key = ThreadLocalRandom.current().nextInt();
+//
+//        // insert a record first with an empty list, it doesn't matter which server we use, it should be consistent
+//        client.send(serverMap.get(servers[0]), insertRecordIntoTableCmd(key, DEFAULT_TABLE_NAME));
+//        // this sleep is to guarantee that the record has been created
+//        Thread.sleep(SLEEP);
+//
+//        for (int i = 0; i < servers.length; i++) {
+//            String node = servers[ThreadLocalRandom.current().nextInt(0, servers.length)];
+//            client.send(serverMap.get(node), updateRecordOfTableCmd(key, DEFAULT_TABLE_NAME));
+//            // we just sleep 10 milliseconds this time
+//            Thread.sleep(1);
+//        }
+//        Thread.sleep(SLEEP);
+//
+//        verifyOrderConsistent(DEFAULT_TABLE_NAME, key);
+//    }
 
     /**
      * This test will not sleep and send more requests (i.e., 10)
@@ -331,23 +329,30 @@ public class Grader extends DefaultTest {
      */
     @Test
     public void test16_UpdateRecordFastest_RandomServer() throws InterruptedException, IOException {
-        // generate a random key for this test
-        int key = ThreadLocalRandom.current().nextInt();
+        int failed = 0;
+        for (int j = 0; j < 300; j++) {
+            System.out.println("Running test "+ j);
 
-        // insert a record first with an empty list, it doesn't matter which server we use, it should be consistent
-        client.send(serverMap.get(servers[0]), insertRecordIntoTableCmd(key, DEFAULT_TABLE_NAME));
-        // this sleep is to guarantee that the record has been created
-        Thread.sleep(SLEEP);
+            // generate a random key for this test
+            int key = ThreadLocalRandom.current().nextInt();
 
-        for (int i = 0; i < NUM_REQS; i++) {
-            String node = servers[ThreadLocalRandom.current().nextInt(0, servers.length)];
-            client.send(serverMap.get(node), updateRecordOfTableCmd(key, DEFAULT_TABLE_NAME));
+            // insert a record first with an empty list, it doesn't matter which server we use, it should be consistent
+            client.send(serverMap.get(servers[0]), insertRecordIntoTableCmd(key, DEFAULT_TABLE_NAME));
+            // this sleep is to guarantee that the record has been created
+            Thread.sleep(SLEEP);
 
+            for (int i = 0; i < 5; i++) {
+                String node = servers[ThreadLocalRandom.current().nextInt(0, servers.length)];
+//            System.out.println("Sent to " + node + " with " + sequencer);
+                client.send(serverMap.get(node), updateRecordOfTableCmd(key, DEFAULT_TABLE_NAME));
+            }
+
+            Thread.sleep(SLEEP * 5 / SLEEP_RATIO);
+
+            if(!verifyOrderConsistent(DEFAULT_TABLE_NAME, key))
+                failed++;
         }
-
-        Thread.sleep(SLEEP * NUM_REQS / SLEEP_RATIO);
-
-        verifyOrderConsistent(DEFAULT_TABLE_NAME, key);
+        System.out.println("Total failed cases "+ failed);
     }
 
 
@@ -390,7 +395,7 @@ public class Grader extends DefaultTest {
             Assert.assertFalse(match);
     }
 
-    private void verifyOrderConsistent(String table, int key) {
+    private Boolean verifyOrderConsistent(String table, int key) {
         String[] results = new String[servers.length];
         int i = 0;
         boolean nonEmpty = false;
@@ -403,16 +408,26 @@ public class Grader extends DefaultTest {
             }
             i++;
         }
+
         i = 0;
         boolean match = true;
+
         for (String result : results) {
             if (!results[0].equals(result))
                 match = false;
         }
-        Assert.assertTrue(nonEmpty && match);
+
+
+
+//        Assert.assertTrue(nonEmpty && match);
+        if(nonEmpty && match)
+            return true;
+
+        System.out.println(nonEmpty);
+        System.out.println(match);
         for(i=0; i<results.length; i++)
             System.out.println(i+":"+results[i]);
-
+        return false;
     }
 
     private void testCreateTableSleep(boolean single) throws
@@ -513,7 +528,7 @@ public class Grader extends DefaultTest {
     }
 
     // This is only used to fetch the result from the table by session directly connected to cassandra
-    private static String readResultFromTableCmd(int key, String table, String keyspace) {
+    private static String  readResultFromTableCmd(int key, String table, String keyspace) {
         return "select events from " + keyspace + "." + table + " where id=" + key + ";";
     }
 
@@ -561,13 +576,11 @@ public class Grader extends DefaultTest {
     }
 
     public static void main(String[] args) throws IOException {
-
         Result result = JUnitCore.runClasses(Grader.class);
         for (Failure failure : result.getFailures()) {
             System.out.println(failure.toString());
             failure.getException().printStackTrace();
         }
-
     }
 
 }
